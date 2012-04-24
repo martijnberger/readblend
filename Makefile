@@ -1,6 +1,6 @@
 
 CC = gcc
-COPTS = -O2 -Wall
+COPTS = -O0 -Wall -g -ggdb
 
 #CC = gcc31
 #COPTS = -O2 -Wall -ggdb -lm
@@ -8,6 +8,7 @@ COPTS = -O2 -Wall
 #COPTS = -O3 -g -fno-inline-functions -ffast-math -pg -Wall
 #COPTS = -ggdb -Wall
 
+LDLIBS = -lm
 CFLAGS = $(COPTS) $(INCS) -lm
 
 EXEC = testblend
@@ -32,5 +33,5 @@ clean:
 #	ls -la flynn-testdir.tar.gz
 
 $(EXEC): $(OBJ_OBJS)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
