@@ -509,6 +509,13 @@ blend_read(MY_FILETYPE* file)
     return NULL;
   }
 
+  char pnt_size;
+  MY_READ(&pnt_size, 8, 1, file);
+  if (pnt_size == '-'){
+      dprintf(stderr, "8 byte pointers not supported.\n");
+      return NULL;
+  }
+
   /* Alloc a handle to return */
 
   bf = bf_new();
