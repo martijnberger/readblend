@@ -84,9 +84,9 @@ main(int argc, char *argv[])
     goto closeit;
   }
 
-  blend_dump_typedefs(bf);
+  //blend_dump_typedefs(bf);
 
-  blend_dump_blocks(bf);
+  //blend_dump_blocks(bf);
 
   fflush(stdout);
 
@@ -103,7 +103,7 @@ main(int argc, char *argv[])
 
 
   blend_free(bf);
-
+ printf("\n");
  closeit:
   MY_CLOSE(file);
   return rtn;

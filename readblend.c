@@ -510,11 +510,19 @@ blend_read(MY_FILETYPE* file)
   }
 
   char pnt_size;
-  MY_READ(&pnt_size, 8, 1, file);
+  MY_READ(&pnt_size, 1, 1, file);
   if (pnt_size == '-'){
       dprintf(stderr, "8 byte pointers not supported.\n");
       return NULL;
   }
+
+  char endianness;
+  MY_READ(&endianness, 1, 1, file);
+  dprintf(stderr, "Endianness: %c\n", endianness);
+
+  char blender_version[4] = {0,0,0,0};
+  MY_READ(blender_version, 1, 3, file);
+  dprintf(stderr, "Version: %c.%c%c\n", blender_version[0], blender_version[1], blender_version[2]);
 
   /* Alloc a handle to return */
 

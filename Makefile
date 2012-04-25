@@ -1,5 +1,5 @@
 
-CC = gcc
+CC = clang
 COPTS = -O0 -Wall -g -ggdb
 
 #CC = gcc31
