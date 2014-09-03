@@ -1,11 +1,9 @@
 
 #include <stdlib.h>
-//#include <stdint.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <math.h>
-
-#include "abs-file.h"
-
 
 #define B_DEBUG
 
@@ -154,25 +152,25 @@ bf_new(void)
 
 
 static long
-seek_past_string(MY_FILETYPE* file, const char *str) {
+seek_past_string(FILE* file, const char *str) {
   const int match_max = strlen(str);
   int match_now = 0;
 
   do {
-    const char c = MY_GETC(file);
+	const char c = fgetc(file);
     if (c == str[match_now]) {
       ++match_now;
     } else {
       match_now = 0;
     }
   } while(match_now < match_max &&
-	  !MY_ATEOF(file));
+	  !feof(file));
 
-  if (MY_ATEOF(file)) {
+  if (feof(file)) {
     return -1;
   }
 
-  return MY_TELL(file) - match_max;
+  return ftell(file) - match_max;
 }
 
 #define EXPANDO_MULTIPLE(ARRAY,ADDITIONPTR,NUMBER) \
@@ -191,9 +189,9 @@ do { \
 
 
 static unsigned short
-read_ushort(MY_FILETYPE* file) {
+read_ushort(FILE* file) {
   unsigned char c[2];
-  if (MY_READ(c, 2, 1, file) == 1) {
+  if (fread(c, 2, 1, file) == 1) {
     return c[0] | (c[1]<<8);
   } else {
     return 0xFFFF;
@@ -202,9 +200,9 @@ read_ushort(MY_FILETYPE* file) {
 
 
 static long
-read_long(MY_FILETYPE* file) {
+read_long(FILE* file) {
   unsigned char c[4];
-  if (MY_READ(c, 4, 1, file) == 1) {
+  if (fread(c, 4, 1, file) == 1) {
     return ((unsigned long)c[0] | (c[1]<<8) | (c[2]<<16) | (c[3]<<24));
   } else {
     return 0xFFFFFFFF;
@@ -213,9 +211,9 @@ read_long(MY_FILETYPE* file) {
 
 
 static unsigned long
-read_ulong(MY_FILETYPE* file) {
+read_ulong(FILE* file) {
   unsigned char c[4];
-  if (MY_READ(c, 4, 1, file) == 1) {
+  if (fread(c, 4, 1, file) == 1) {
     return c[0] | (c[1]<<8) | (c[2]<<16) | (c[3]<<24);
   } else {
     return 0xFFFFFFFF;
@@ -316,7 +314,7 @@ name_is_array(char* name, int* dim1, int* dim2) {
 
 
 static void
-recursively_read_type(MY_FILETYPE* file, BlendFile* bf,
+recursively_read_type(FILE* file, BlendFile* bf,
 		      unsigned long section_type,
 		      BlendField* field)
 {
@@ -348,10 +346,10 @@ recursively_read_type(MY_FILETYPE* file, BlendFile* bf,
 	for (j=0; j<dim1; ++j) {
 	  for (k=0; k<dim2; ++k) {
 	    /*fprintf(stderr, "*");*/
-	    new_data[0] = MY_GETC(file);
-	    new_data[1] = MY_GETC(file);
-	    new_data[2] = MY_GETC(file);
-	    new_data[3] = MY_GETC(file);
+		new_data[0] = fgetc(file);
+		new_data[1] = fgetc(file);
+		new_data[2] = fgetc(file);
+		new_data[3] = fgetc(file);
 	    EXPANDO(field->field_offsets, field->field_bytes_count);
 	    EXPANDO_MULTIPLE(field->field_bytes, new_data, new_data_size);
 	    /*fprintf(stderr, "N*(%d) ", new_data_size);*/
@@ -381,7 +379,7 @@ recursively_read_type(MY_FILETYPE* file, BlendFile* bf,
       }*/
     if (new_data_size) {
       new_data = malloc(new_data_size);
-      MY_READ(new_data, 1, bf->types[section_type].size, file);
+	  fread(new_data, 1, bf->types[section_type].size, file);
       EXPANDO(field->field_offsets, field->field_bytes_count);
       EXPANDO_MULTIPLE(field->field_bytes, new_data, new_data_size);
       /*fprintf(stderr, "ND(%d) ", new_data_size); */
@@ -396,7 +394,7 @@ recursively_read_type(MY_FILETYPE* file, BlendFile* bf,
 
 
 static BlendField
-read_type(MY_FILETYPE* file, BlendFile* bf,
+read_type(FILE* file, BlendFile* bf,
 	  unsigned long section_type)
 {
   BlendField rtn;
@@ -413,7 +411,7 @@ read_type(MY_FILETYPE* file, BlendFile* bf,
 
 
 static int
-blend_read_data(MY_FILETYPE* file, BlendFile* bf)
+blend_read_data(FILE* file, BlendFile* bf)
 {
   long next_block_start = 12;
   int finished_extracting = 0;
@@ -427,9 +425,9 @@ blend_read_data(MY_FILETYPE* file, BlendFile* bf)
     unsigned long section_type;
     unsigned long section_ents;
 
-    MY_SEEK(file, next_block_start);
+	fseek(file, next_block_start, SEEK_SET);
 
-    MY_READ(section_name, 4, 1, file);
+	fread(section_name, 4, 1, file);
 
     if (strcmp(section_name, "DNA1") != 0) {
       int i;
@@ -462,17 +460,17 @@ blend_read_data(MY_FILETYPE* file, BlendFile* bf)
       next_block_start += 4+4+4+4+4 + section_size;
 
 #ifdef B_DEBUG
-      if (MY_TELL(file) > next_block_start) {
+	  if (ftell(file) > next_block_start) {
 	dprintf(stderr, " **OVER-READ(%ld,%ld)** ",
-		MY_TELL(file), next_block_start);
+		ftell(file), next_block_start);
 	if (strcmp(bf->types[section_type].name, "Link") == 0 &&
-	    MY_TELL(file) - next_block_start == 4) {
+		ftell(file) - next_block_start == 4) {
 	  dprintf(stderr, "<- don't panic, known Link struct weirdness.");
 	} else {
 	  dprintf(stderr, "<- okay, PANIC!");
 	}
 	dprintf(stderr, "\n");
-      } else if (MY_TELL(file) < next_block_start) {
+	  } else if (ftell(file) < next_block_start) {
 	/*dprintf(stderr, " **under-READ(%ld,%ld)** ",
 	  MY_TELL(file), next_block_start);*/
       } else {
@@ -491,7 +489,7 @@ blend_read_data(MY_FILETYPE* file, BlendFile* bf)
 
 
 BlendFile*
-blend_read(MY_FILETYPE* file)
+blend_read(FILE* file)
 {
   char blender_mark[8] = {0,0,0,0, 0,0,0,0};
   BlendFile *bf;
@@ -499,29 +497,29 @@ blend_read(MY_FILETYPE* file)
   long sdnaname_size, type_size, tlen_size, strc_size;
   long sdnaname_ents, type_ents, tlen_ents, strc_ents;
 
-  MY_REWIND(file);
+  rewind(file);
 
   /* Check file signature */
 
-  MY_READ(blender_mark, 1, 7, file);
+  fread(blender_mark, 1, 7, file);
   if (strcmp(blender_mark, "BLENDER") != 0) {
     dprintf(stderr, "Not a Blender file.\n");
     return NULL;
   }
 
   char pnt_size;
-  MY_READ(&pnt_size, 1, 1, file);
+  fread(&pnt_size, 1, 1, file);
   if (pnt_size == '-'){
       dprintf(stderr, "8 byte pointers not supported.\n");
       return NULL;
   }
 
   char endianness;
-  MY_READ(&endianness, 1, 1, file);
+  fread(&endianness, 1, 1, file);
   dprintf(stderr, "Endianness: %c\n", endianness);
 
   char blender_version[4] = {0,0,0,0};
-  MY_READ(blender_version, 1, 3, file);
+  fread(blender_version, 1, 3, file);
   dprintf(stderr, "Version: %c.%c%c\n", blender_version[0], blender_version[1], blender_version[2]);
 
   /* Alloc a handle to return */
@@ -562,7 +560,7 @@ blend_read(MY_FILETYPE* file)
 
   /* read the NAME table */
 
-  MY_SEEK(file, sdnaname_offs);
+  fseek(file, sdnaname_offs, SEEK_SET);
   {
     long offs = 0;
     int i;
@@ -574,7 +572,7 @@ blend_read(MY_FILETYPE* file)
       int this_name_chars_count = 0;
 
       do {
-	const char c = MY_GETC(file);
+	const char c = fgetc(file);
 	++offs;
 	if (offs == sdnaname_size ||
 	    c == '\0') {
@@ -599,7 +597,7 @@ blend_read(MY_FILETYPE* file)
 
   /* read the TYPE table */
 
-  MY_SEEK(file, type_offs);
+  fseek(file, type_offs, SEEK_SET);
   {
     long offs = 0;
     int i;
@@ -611,7 +609,7 @@ blend_read(MY_FILETYPE* file)
       BlendType bt;
 
       do {
-	const char c = MY_GETC(file);
+	const char c = fgetc(file);
 	++offs;
 	if (offs == type_size ||
 	    c == '\0') {
@@ -637,7 +635,7 @@ blend_read(MY_FILETYPE* file)
 
   /* read the TLEN table */
 
-  MY_SEEK(file, tlen_offs);
+  fseek(file, tlen_offs, SEEK_SET);
   {
     int i;
     for (i=0; i<bf->types_count; ++i) {
@@ -649,7 +647,7 @@ blend_read(MY_FILETYPE* file)
 
   /* Read the STRC table */
   
-  MY_SEEK(file, strc_offs);
+  fseek(file, strc_offs, SEEK_SET);
   {
     int i,j;
     for (i=0; i<strc_ents; ++i) {
@@ -2338,9 +2336,9 @@ void
 blend_acquire_mesh(const char *fname, const char *want_name, bMesh *mesh)
 {
   BlendFile* bf;
-  MY_FILETYPE *fp;
+  FILE *fp;
 
-  fp = MY_OPEN_FOR_READ(fname);
+  fp = fopen(fname, "rb");
 
   if (!fp) {
     dprintf(stderr, "couldn't open file %s.\n", fname);
@@ -2359,7 +2357,7 @@ blend_acquire_mesh(const char *fname, const char *want_name, bMesh *mesh)
   }
   blend_free(bf);
 
-  MY_CLOSE(fp);
+  fclose(fp);
 }
 
 

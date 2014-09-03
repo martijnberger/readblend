@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-
-#include "abs-file.h"
+#include <stdint.h>
 
 #include "readblend.h"
 
@@ -60,7 +59,7 @@ blockiter(BLENDBLOCKCALLBACK_ARGS) {
 int
 main(int argc, char *argv[])
 {
-  MY_FILETYPE *file;
+  FILE *file;
   BlendFile *bf;
   int rtn = 0;
 
@@ -69,7 +68,7 @@ main(int argc, char *argv[])
     return -1;
   }
 
-  file = MY_OPEN_FOR_READ(argv[1]);
+  file = fopen(argv[1], "rb");
 
   if (!file) {
     fprintf(stderr, "couldn't open file. :(\n");
@@ -84,9 +83,9 @@ main(int argc, char *argv[])
     goto closeit;
   }
 
-  //blend_dump_typedefs(bf);
+  blend_dump_typedefs(bf);
 
-  //blend_dump_blocks(bf);
+  blend_dump_blocks(bf);
 
   fflush(stdout);
 
@@ -105,6 +104,6 @@ main(int argc, char *argv[])
   blend_free(bf);
  printf("\n");
  closeit:
-  MY_CLOSE(file);
+  fclose(file);
   return rtn;
 }

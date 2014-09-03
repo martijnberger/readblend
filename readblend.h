@@ -33,7 +33,9 @@
 //#include <cfloat>
 #include <float.h>
 
-#include "abs-file.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
 
 /* TODO: Doxygen me. */
 
@@ -58,7 +60,7 @@
    .blend data handle is returned.
 */
 
-BlendFile* blend_read(MY_FILETYPE* file);
+BlendFile* blend_read(FILE* file);
 
 
 /* Free all of the given BlendFile data (note: obviously, do not attempt
