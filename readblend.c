@@ -5,7 +5,7 @@
 #include <string.h>
 #include <math.h>
 
-#define B_DEBUG
+#define B_DEBUG 1
 
 
 #ifdef B_DEBUG
@@ -52,7 +52,7 @@ struct _BlendField {
 typedef struct _BlendBlock BlendBlock;
 struct _BlendBlock {
   char tag[5];
-  uint32_t blender_pointer;
+  u_int64_t blender_pointer;
   /*void* fixed_pointer;*/
 
   int type_index;
@@ -80,6 +80,8 @@ typedef struct {
   int blocks_count;
 
   int name_undef; /* index of the name we add specially for top blocks */
+
+  char pointer_size;
   
 } IBlendFile;
 
@@ -220,6 +222,24 @@ read_ulong(FILE* file) {
   }
 }
 
+static u_int64_t
+read_u_int64_t(FILE* file) {
+    unsigned char c[8];
+    if (fread(c, 8, 1, file) == 1) {
+        return c[0] | (c[1]<<8) | (c[2]<<16) | (c[3]<<24) | (c[4]<<32) | (c[5]<<40) | (c[6]<<48) | (c[7]<<56);
+    } else {
+        return 0xFFFFFFFFFFFFFFFF;
+    }
+}
+
+static u_int64_t
+read_pointer(FILE* file, char pnt_size){
+    if(pnt_size == 4)
+        return read_ulong(file);
+    else
+        return read_u_int64_t(file);
+
+}
 
 static int
 name_is_pointer(char* name) {
@@ -415,13 +435,13 @@ blend_read_data(FILE* file, BlendFile* bf)
 {
   long next_block_start = 12;
   int finished_extracting = 0;
-  char section_name[5] = {0,0, 0,0, 0};
+  char section_name[5] = {0, 0, 0, 0, 0};
 
   /* slurp up the whole file block by block! */
 
   do {
     unsigned long section_size;
-    unsigned long section_pointer;
+    u_int64_t section_pointer;
     unsigned long section_type;
     unsigned long section_ents;
 
@@ -434,7 +454,7 @@ blend_read_data(FILE* file, BlendFile* bf)
       BlendBlock block;
 
       section_size    = read_ulong(file);
-      section_pointer = read_ulong(file);
+      section_pointer = read_pointer(file, bf->pointer_size);
       section_type    = read_ulong(file);
       section_type    = bf->strc_indices[section_type];
       section_ents    = read_ulong(file);
@@ -443,21 +463,20 @@ blend_read_data(FILE* file, BlendFile* bf)
       block.tag[4] = '\0';
       block.type_index = section_type;
       block.blender_pointer = section_pointer;
-      /*block.fixed_pointer = NULL;*/
       block.array_entries = NULL;
       block.array_entries_count = 0;
 
-      /*dprintf(stderr, "\nsizeof(%s)=%ld: %s[%ld]\n", section_name, section_size, bf->types[section_type].name, section_ents); */
+      dprintf(stderr, "\nBLOCK  %s sizeof=%ld: %s[%ld]\n", section_name, section_size, bf->types[section_type].name, section_ents);
 
       for (i=0; i<section_ents; ++i) {
-	BlendField field;
-	field = read_type(file, bf, section_type);
-	EXPANDO(block.array_entries, field);
+            BlendField field;
+            field = read_type(file, bf, section_type);
+            EXPANDO(block.array_entries, field);
       }
        
       EXPANDO(bf->blocks, block);
 
-      next_block_start += 4+4+4+4+4 + section_size;
+      next_block_start += 4+bf->pointer_size+4+4+4 + section_size;
 
 #ifdef B_DEBUG
 	  if (ftell(file) > next_block_start) {
@@ -509,10 +528,11 @@ blend_read(FILE* file)
 
   char pnt_size;
   fread(&pnt_size, 1, 1, file);
-  if (pnt_size == '-'){
-      dprintf(stderr, "8 byte pointers not supported.\n");
-      return NULL;
-  }
+  if (pnt_size == '-')
+    pnt_size = 8;
+  else
+    pnt_size = 4;
+
 
   char endianness;
   fread(&endianness, 1, 1, file);
@@ -667,6 +687,7 @@ blend_read(FILE* file)
     }
   }
 
+  bf->pointer_size = pnt_size;
   blend_read_data(file, bf);
 
   /* Return the new handle */
@@ -1303,7 +1324,7 @@ blend_dump_blocks(BlendFile* bf)
   for (i=0; i<bf->blocks_count; ++i) {
     BlendBlock* bb = &bf->blocks[i];
     printf("tag='%s'\tptr=%p\ttype=%s\t[%4d]",
-	   bb->tag, /*bb->blender_pointer,*/ bb,
+       bb->tag, bb->blender_pointer, bb,
 	   bf->types[bb->type_index].name,
 	   bb->array_entries_count);
     block_ID_finder(bb, bf, &ifd);
